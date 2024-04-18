@@ -8,27 +8,25 @@ typedef struct {
     const char *opcode;         // O código de operação da instrução
     const char *funct3;         // O campo funct3 da instrução
     const char *funct7;         // O campo funct7 da instrução (se existir)
-    int tem_rs2;                // Indica se a instrução possui um segundo registrador
-    int tem_imediato;          // Indica se a instrução possui um imediato
-    const char *tipo_imediato; // O tipo de imediato (I, S, B) se a instrução tem um
+    const char *tipo;           // Tipo da instrução: "R", "I", "S" ou "B"
 } InformacaoInstrucao;
 
 // Definição das informações para cada instrução
 const InformacaoInstrucao instrucoes[] = {
-    {"lb", "0000011", "000", "", 0, 1, "I"},
-    {"sb", "0100011", "000", "", 1, 1, "S"},
-    {"add", "0110011", "000", "0000000", 1, 0, ""},
-    {"sub", "0110011", "000", "0100000", 1, 0, ""},
-    {"and", "0110011", "111", "0000000", 1, 0, ""},
-    {"or", "0110011", "110", "0000000", 1, 0, ""},
-    {"xor", "0110011", "100", "0000000", 1, 0, ""},
-    {"addi", "0010011", "000", "", 0, 1, "I"},
-    {"andi", "0010011", "111", "", 0, 1, "I"},
-    {"ori", "0010011", "110", "", 0, 1, "I"},
-    {"sll", "0110011", "001", "0000000", 1, 0, ""},
-    {"srl", "0110011", "101", "0000000", 1, 0, ""},
-    {"bne", "1100011", "001", "", 1, 1, "B"},
-    {"beq", "1100011", "000", "", 1, 1, "B"}
+    {"lb", "0000011", "000", "", "I"},
+    {"sb", "0100011", "000", "", "S"},
+    {"add", "0110011", "000", "0000000", "R"},
+    {"sub", "0110011", "000", "0100000", "R"},
+    {"and", "0110011", "111", "0000000", "R"},
+    {"or", "0110011", "110", "0000000", "R"},
+    {"xor", "0110011", "100", "0000000", "R"},
+    {"addi", "0010011", "000", "", "I"},
+    {"andi", "0010011", "111", "", "I"},
+    {"ori", "0010011", "110", "", "I"},
+    {"sll", "0110011", "001", "0000000", "R"},
+    {"srl", "0110011", "101", "0000000", "R"},
+    {"bne", "1100011", "001", "", "B"},
+    {"beq", "1100011", "000", "", "B"}
 };
 
 // Função para obter o número do registro a partir de sua representação em string
@@ -88,19 +86,29 @@ char* montar(const char* instrucao) {
         return NULL; // Se não houver mais tokens, retorna NULL
     }
 
-    if (info->tem_rs2) {
-        inteiro_para_binario(obter_numero_registro(token), rd, 5);
-        token = strtok(NULL, delimitadores);
-        if (token == NULL) {
-            return NULL;
-        }
-        inteiro_para_binario(obter_numero_registro(token), rs1, 5);
-        token = strtok(NULL, delimitadores);
-        if (token == NULL) {
-            return NULL;
-        }
-        inteiro_para_binario(obter_numero_registro(token), rs2, 5);
-    } else if (info->tem_imediato) {
+    if (strcmp(info->tipo, "R") == 0) {
+        strcpy(rd, rs2);
+        strcpy(rs2, rs1);
+        strcpy(rs1, funct7);
+        strcpy(funct7, "");
+    } else if (strcmp(info->tipo, "I") == 0) {
+        strcpy(rd, rs1);
+        strcpy(rs1, imediato);
+        strcpy(imediato, "");
+    } else if (strcmp(info->tipo, "S") == 0 || strcmp(info->tipo, "B") == 0) {
+        strcpy(rd, rs2);
+        strcpy(rs2, rs1);
+        strcpy(rs1, imediato);
+        strcpy(imediato, "");
+    }
+
+    strcpy(funct3, info->funct3);
+
+    if (info->funct7[0] != '\0') {
+        strcpy(funct7, info->funct7);
+    }
+
+    if (info->tipo[0] != 'R') {
         char* imediato_token = token;
         token = strtok(NULL, delimitadores);
         if (token == NULL) {
@@ -108,7 +116,7 @@ char* montar(const char* instrucao) {
         }
         inteiro_para_binario(obter_numero_registro(token), rs1, 5);
 
-        char *imediato_binario = obter_imediato(imediato_token, info->tipo_imediato);
+        char *imediato_binario = obter_imediato(imediato_token, info->tipo);
         if (imediato_binario == NULL) {
             return NULL;
         }
@@ -121,24 +129,21 @@ char* montar(const char* instrucao) {
             return NULL;
         }
         inteiro_para_binario(obter_numero_registro(token), rs1, 5);
+        token = strtok(NULL, delimitadores);
+        if (token == NULL) {
+            return NULL;
+        }
+        inteiro_para_binario(obter_numero_registro(token), rs2, 5);
     }
 
-    if (info->funct7[0] != '\0') {
-        strcpy(funct7, info->funct7);
-    }
-    strcpy(funct3, info->funct3);
-
-    if (info->tem_rs2) {
-        strcat(instrucao_binaria, funct7); // Funct7
-        strcat(instrucao_binaria, rs2); // rs2
-    }
-
+    strcat(instrucao_binaria, funct7); // Funct7
+    strcat(instrucao_binaria, rs2); // rs2
     strcat(instrucao_binaria, rs1); // rs1
     strcat(instrucao_binaria, funct3); // Funct3
     strcat(instrucao_binaria, rd); // rd
     strcat(instrucao_binaria, opcode); // Opcode
 
-    if (info->tem_imediato) {
+    if (info->tipo[0] != 'R') {
         strcat(instrucao_binaria, imediato); // Immediate
     }
 
